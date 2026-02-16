@@ -113,11 +113,16 @@ export const DealDetailModal: React.FC<DealDetailModalProps> = ({ deal, onClose,
   const handleShare = async () => {
     const shareText = `${deal.title} at ${deal.restaurantName} – only ${deal.currency}${deal.price.toFixed(2)}!`;
     try {
-      const { Share } = await import('@capacitor/share');
-      await Share.share({ title: deal.title, text: shareText, dialogTitle: 'Share this deal' });
-    } catch {
+      if (navigator.share) {
+        await navigator.share({ title: deal.title, text: shareText });
+        return;
+      }
+
       // Fallback: copy to clipboard
-      try { await navigator.clipboard.writeText(shareText); } catch {}
+      await navigator.clipboard.writeText(shareText);
+      showToast('Deal copied to clipboard');
+    } catch {
+      // no-op
     }
   };
 

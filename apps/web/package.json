@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/camera": "^8.0.1",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/share": "^8.0.1",
     "@fooddeals/shared": "workspace:*",
     "@google/genai": "^1.37.0",
     "@supabase/supabase-js": "^2.93.3",
