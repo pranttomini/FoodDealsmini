@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        allowedHosts: ['v45207.1blu.de', '178.254.22.121', 'localhost'],
       },
       plugins: [react()],
       define: {
