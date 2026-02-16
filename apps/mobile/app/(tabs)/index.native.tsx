@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ActivityIndicator, View, Alert, Platform, Text } from 'react-native';
+import { StyleSheet, ActivityIndicator, View, Alert, Text } from 'react-native';
+import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { supabase } from '../../lib/supabase';
 import { DealDetailModal } from '../../components/DealDetailModal';
@@ -85,24 +86,6 @@ export default function MapScreen() {
     );
   }
 
-  if (Platform.OS === 'web') {
-    return (
-      <View style={styles.webPlaceholder}>
-        <Text style={styles.webTitle}>Map View on mobile app</Text>
-        <Text style={styles.webText}>Map rendering is available in native Expo Go builds.</Text>
-        <Text style={styles.webText}>Open List tab for full deal browsing in web preview.</Text>
-      </View>
-    );
-  }
-
-  // keep runtime require for native only (avoid web static resolution)
-  // eslint-disable-next-line no-eval
-  const nativeRequire = eval('require');
-  const Maps = nativeRequire('react-native-maps');
-  const MapView = Maps.default;
-  const Marker = Maps.Marker;
-  const PROVIDER_DEFAULT = Maps.PROVIDER_DEFAULT;
-
   return (
     <View style={styles.container}>
       <MapView
@@ -144,14 +127,4 @@ const styles = StyleSheet.create({
   map: { width: '100%', height: '100%' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.bg },
   loadingText: { marginTop: 10, color: theme.colors.muted },
-  webPlaceholder: {
-    flex: 1,
-    backgroundColor: theme.colors.bg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-    gap: 10,
-  },
-  webTitle: { fontSize: 22, fontWeight: '800', color: theme.colors.text },
-  webText: { fontSize: 14, color: theme.colors.muted, textAlign: 'center' },
 });
