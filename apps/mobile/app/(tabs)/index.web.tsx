@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { theme } from '../../constants/theme';
 
-export default function MapScreen() {
+export default function MapScreenWeb() {
   return (
     <View style={styles.webPlaceholder}>
       <Text style={styles.webTitle}>Map View on mobile app</Text>

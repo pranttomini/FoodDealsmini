@@ -9,13 +9,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Text,
+  View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { Text, View } from '@/components/Themed';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { router } from 'expo-router';
+import { Pill, PrimaryButton, SurfaceCard } from '../../components/ui/MobilePrimitives';
+import { theme } from '../../constants/theme';
 
 const BERLIN_CENTER = { latitude: 52.52, longitude: 13.405 };
 
@@ -40,7 +43,7 @@ const CUISINE_TYPES = [
 ];
 
 export default function PostScreen() {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -98,19 +101,14 @@ export default function PostScreen() {
       const ext = uri.split('.').pop() || 'jpg';
       const fileName = `${user!.id}_${Date.now()}.${ext}`;
 
-      const { data, error } = await supabase.storage
-        .from('deal-images')
-        .upload(fileName, blob, {
-          contentType: `image/${ext}`,
-          upsert: false,
-        });
+      const { error } = await supabase.storage.from('deal-images').upload(fileName, blob, {
+        contentType: `image/${ext}`,
+        upsert: false,
+      });
 
       if (error) throw error;
 
-      const { data: urlData } = supabase.storage
-        .from('deal-images')
-        .getPublicUrl(fileName);
-
+      const { data: urlData } = supabase.storage.from('deal-images').getPublicUrl(fileName);
       return urlData.publicUrl;
     } catch (error) {
       console.error('Upload error:', error);
@@ -121,9 +119,7 @@ export default function PostScreen() {
   const getCurrentLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        return BERLIN_CENTER;
-      }
+      if (status !== 'granted') return BERLIN_CENTER;
 
       const location = await Location.getCurrentPositionAsync({});
       return {
@@ -136,7 +132,6 @@ export default function PostScreen() {
   };
 
   const handleSubmit = async () => {
-    // Validation
     if (!formData.title || !formData.restaurantName || !formData.dealPrice) {
       Alert.alert('Missing fields', 'Please fill in all required fields');
       return;
@@ -163,7 +158,6 @@ export default function PostScreen() {
     setLoading(true);
 
     try {
-      // Upload image if provided
       let imageUrl = null;
       if (imageUri) {
         imageUrl = await uploadImage(imageUri);
@@ -174,11 +168,9 @@ export default function PostScreen() {
         }
       }
 
-      // Get current location
       const location = await getCurrentLocation();
 
-      // Insert deal into Supabase
-      const { data, error } = await supabase.from('deals').insert({
+      const { error } = await supabase.from('deals').insert({
         user_id: user.id,
         title: formData.title,
         description: formData.description,
@@ -200,7 +192,6 @@ export default function PostScreen() {
         {
           text: 'OK',
           onPress: () => {
-            // Reset form
             setFormData({
               title: '',
               description: '',
@@ -212,8 +203,6 @@ export default function PostScreen() {
               cuisineType: 'other',
             });
             setImageUri(null);
-
-            // Navigate to map or list tab
             router.push('/(tabs)');
           },
         },
@@ -236,173 +225,132 @@ export default function PostScreen() {
 
   if (!user) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Post a Deal</Text>
-        <Text style={styles.notLoggedIn}>Please log in to post deals</Text>
+      <View style={styles.authFallback}>
+        <Text style={styles.authTitle}>Post a New Deal</Text>
+        <Text style={styles.authText}>Please log in to share deals with the community.</Text>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Post a New Deal</Text>
+        <Text style={styles.title}>Create Deal</Text>
+        <Text style={styles.subtitle}>Highlight the value fast: offer, place, and proof.</Text>
 
-        {/* Image Picker */}
-        <TouchableOpacity style={styles.imagePicker} onPress={showImageOptions}>
+        <SurfaceCard>
+          <Text style={styles.sectionTitle}>Cover Photo</Text>
+          <TouchableOpacity style={styles.imagePicker} onPress={showImageOptions} activeOpacity={0.9}>
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Text style={styles.imagePlaceholderTitle}>📷 Add a photo</Text>
+                <Text style={styles.imagePlaceholderSub}>Deals with photos get more votes.</Text>
+              </View>
+            )}
+          </TouchableOpacity>
           {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Text style={styles.imagePlaceholderText}>📷 Add Photo</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+            <PrimaryButton title="Change Photo" onPress={showImageOptions} secondary />
+          ) : null}
+        </SurfaceCard>
 
-        {/* Title */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Deal Title *</Text>
+        <SurfaceCard>
+          <Text style={styles.sectionTitle}>Core Details</Text>
+          <FieldLabel text="Deal Title *" />
           <TextInput
             style={styles.input}
             value={formData.title}
             onChangeText={(text) => setFormData({ ...formData, title: text })}
-            placeholder="e.g., 2-for-1 Pizza"
-            placeholderTextColor="#999"
+            placeholder="2-for-1 Pizza after 18:00"
+            placeholderTextColor={theme.colors.textSoft}
           />
-        </View>
 
-        {/* Description */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Description</Text>
+          <FieldLabel text="Description" />
           <TextInput
             style={[styles.input, styles.textArea]}
             value={formData.description}
             onChangeText={(text) => setFormData({ ...formData, description: text })}
-            placeholder="Describe the deal..."
-            placeholderTextColor="#999"
+            placeholder="What exactly is included? Mention time, terms, and quality."
+            placeholderTextColor={theme.colors.textSoft}
             multiline
             numberOfLines={4}
           />
-        </View>
 
-        {/* Restaurant */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Restaurant Name *</Text>
+          <FieldLabel text="Restaurant Name *" />
           <TextInput
             style={styles.input}
             value={formData.restaurantName}
             onChangeText={(text) => setFormData({ ...formData, restaurantName: text })}
             placeholder="Restaurant name"
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textSoft}
           />
-        </View>
 
-        {/* Address */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Address</Text>
+          <FieldLabel text="Address" />
           <TextInput
             style={styles.input}
             value={formData.address}
             onChangeText={(text) => setFormData({ ...formData, address: text })}
-            placeholder="Street address, Berlin"
-            placeholderTextColor="#999"
+            placeholder="Street + area (Berlin)"
+            placeholderTextColor={theme.colors.textSoft}
           />
-        </View>
 
-        {/* Prices */}
-        <View style={styles.row}>
-          <View style={[styles.inputGroup, styles.halfWidth]}>
-            <Text style={styles.label}>Deal Price (€) *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.dealPrice}
-              onChangeText={(text) => setFormData({ ...formData, dealPrice: text })}
-              placeholder="9.99"
-              placeholderTextColor="#999"
-              keyboardType="decimal-pad"
-            />
+          <View style={styles.row}>
+            <View style={styles.halfWidth}>
+              <FieldLabel text="Deal Price (€) *" />
+              <TextInput
+                style={styles.input}
+                value={formData.dealPrice}
+                onChangeText={(text) => setFormData({ ...formData, dealPrice: text })}
+                placeholder="9.90"
+                placeholderTextColor={theme.colors.textSoft}
+                keyboardType="decimal-pad"
+              />
+            </View>
+
+            <View style={styles.halfWidth}>
+              <FieldLabel text="Original Price (€)" />
+              <TextInput
+                style={styles.input}
+                value={formData.originalPrice}
+                onChangeText={(text) => setFormData({ ...formData, originalPrice: text })}
+                placeholder="15.90"
+                placeholderTextColor={theme.colors.textSoft}
+                keyboardType="decimal-pad"
+              />
+            </View>
           </View>
+        </SurfaceCard>
 
-          <View style={[styles.inputGroup, styles.halfWidth]}>
-            <Text style={styles.label}>Original Price (€)</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.originalPrice}
-              onChangeText={(text) => setFormData({ ...formData, originalPrice: text })}
-              placeholder="19.99"
-              placeholderTextColor="#999"
-              keyboardType="decimal-pad"
-            />
-          </View>
-        </View>
-
-        {/* Deal Type */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Deal Type</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipContainer}>
+        <SurfaceCard>
+          <Text style={styles.sectionTitle}>Deal Type</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             {DEAL_TYPES.map((type) => (
-              <TouchableOpacity
+              <Pill
                 key={type.value}
-                style={[
-                  styles.chip,
-                  formData.dealType === type.value && styles.chipSelected,
-                ]}
+                label={type.label}
+                selected={formData.dealType === type.value}
                 onPress={() => setFormData({ ...formData, dealType: type.value })}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    formData.dealType === type.value && styles.chipTextSelected,
-                  ]}
-                >
-                  {type.label}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
-        </View>
 
-        {/* Cuisine Type */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Cuisine Type</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipContainer}>
+          <Text style={[styles.sectionTitle, styles.secondarySectionTitle]}>Cuisine Type</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             {CUISINE_TYPES.map((cuisine) => (
-              <TouchableOpacity
+              <Pill
                 key={cuisine.value}
-                style={[
-                  styles.chip,
-                  formData.cuisineType === cuisine.value && styles.chipSelected,
-                ]}
+                label={cuisine.label}
+                selected={formData.cuisineType === cuisine.value}
                 onPress={() => setFormData({ ...formData, cuisineType: cuisine.value })}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    formData.cuisineType === cuisine.value && styles.chipTextSelected,
-                  ]}
-                >
-                  {cuisine.label}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
-        </View>
+        </SurfaceCard>
 
-        {/* Submit Button */}
-        <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Post Deal</Text>
-          )}
-        </TouchableOpacity>
+        <PrimaryButton title={loading ? 'Posting...' : 'Publish Deal'} onPress={handleSubmit} disabled={loading} rightMeta="Berlin" />
+
+        {loading ? <ActivityIndicator color={theme.colors.primary} style={styles.loader} /> : null}
 
         <View style={styles.spacer} />
       </ScrollView>
@@ -410,121 +358,130 @@ export default function PostScreen() {
   );
 }
 
+function FieldLabel({ text }: { text: string }) {
+  return <Text style={styles.label}>{text}</Text>;
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.bg,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    padding: theme.spacing.md,
+    gap: theme.spacing.md,
+    paddingBottom: 120,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    color: theme.colors.text,
+    fontSize: theme.type.h1,
+    fontWeight: '900',
+  },
+  subtitle: {
+    marginTop: 2,
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  sectionTitle: {
+    marginBottom: 12,
+    color: theme.colors.text,
+    fontSize: theme.type.h3,
+    fontWeight: '800',
+  },
+  secondarySectionTitle: {
+    marginTop: 16,
   },
   imagePicker: {
     width: '100%',
     height: 200,
-    marginBottom: 20,
-    borderRadius: 12,
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
+    marginBottom: 12,
   },
   imagePreview: {
     width: '100%',
     height: '100%',
   },
   imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
+    flex: 1,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
     borderStyle: 'dashed',
-    borderRadius: 12,
+    backgroundColor: theme.colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
   },
-  imagePlaceholderText: {
-    fontSize: 16,
-    color: '#6b7280',
+  imagePlaceholderTitle: {
+    color: '#9a3412',
+    fontSize: 18,
+    fontWeight: '800',
   },
-  inputGroup: {
-    marginBottom: 16,
+  imagePlaceholderSub: {
+    marginTop: 6,
+    color: '#b45309',
+    fontSize: 13,
+    textAlign: 'center',
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    fontWeight: '700',
     marginBottom: 8,
+    marginTop: 4,
+    textTransform: 'uppercase',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
     fontSize: 16,
     backgroundColor: '#fff',
+    color: theme.colors.text,
   },
   textArea: {
-    height: 100,
+    height: 110,
     textAlignVertical: 'top',
   },
   row: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   halfWidth: {
     flex: 1,
   },
-  chipContainer: {
-    flexDirection: 'row',
+  chipRow: {
+    paddingBottom: 2,
   },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  chipSelected: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
-  },
-  chipText: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  chipTextSelected: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  submitButton: {
-    backgroundColor: '#10b981',
-    padding: 16,
-    borderRadius: 12,
+  authFallback: {
+    flex: 1,
     alignItems: 'center',
-    marginTop: 20,
+    justifyContent: 'center',
+    backgroundColor: theme.colors.bg,
+    padding: 24,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#9ca3af',
+  authTitle: {
+    color: theme.colors.text,
+    fontSize: 26,
+    fontWeight: '900',
   },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  notLoggedIn: {
-    fontSize: 16,
-    color: '#6b7280',
+  authText: {
+    marginTop: 10,
     textAlign: 'center',
-    marginTop: 20,
+    color: theme.colors.textMuted,
+    fontSize: 15,
+  },
+  loader: {
+    marginTop: 4,
   },
   spacer: {
-    height: 40,
+    height: 20,
   },
 });

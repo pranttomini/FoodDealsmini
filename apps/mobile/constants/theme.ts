@@ -1,10 +1,15 @@
 export const theme = {
   colors: {
-    bg: '#f7f7f8',
+    bg: '#f6f6f7',
     surface: '#ffffff',
+    surfaceAlt: '#fff7ed',
     text: '#111827',
+    textMuted: '#6b7280',
+    textSoft: '#9ca3af',
     muted: '#6b7280',
     border: '#ececec',
+    borderSubtle: '#f0f0f1',
+    borderStrong: '#fed7aa',
     primary: '#f97316',
     primaryDark: '#ea580c',
     success: '#16a34a',
@@ -12,11 +17,26 @@ export const theme = {
     chipBg: '#fff7ed',
     chipText: '#c2410c',
   },
+  spacing: {
+    xs: 6,
+    sm: 10,
+    md: 14,
+    lg: 18,
+    xl: 24,
+  },
   radius: {
     sm: 10,
     md: 14,
     lg: 20,
     xl: 28,
+    pill: 999,
+  },
+  type: {
+    h1: 28,
+    h2: 22,
+    h3: 18,
+    body: 15,
+    caption: 12,
   },
   shadow: {
     card: {

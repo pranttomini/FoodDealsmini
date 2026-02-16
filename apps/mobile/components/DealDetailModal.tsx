@@ -10,10 +10,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Text,
+  View,
 } from 'react-native';
-import { Text, View } from './Themed';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { theme } from '../constants/theme';
+import { Pill, PrimaryButton, SurfaceCard } from './ui/MobilePrimitives';
 
 interface Comment {
   id: string;
@@ -52,7 +55,7 @@ interface DealDetailModalProps {
 }
 
 export function DealDetailModal({ visible, deal, onClose, onDealUpdated }: DealDetailModalProps) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -114,37 +117,29 @@ export function DealDetailModal({ visible, deal, onClose, onDealUpdated }: DealD
       const isChangingVote = userVote && userVote !== voteType;
       const isRemovingVote = userVote === voteType;
 
-      // Optimistic UI update
       if (isRemovingVote) {
         setUserVote(null);
-        if (voteType === 'up') setLocalUpvotes(prev => prev - 1);
-        else setLocalDownvotes(prev => prev - 1);
+        if (voteType === 'up') setLocalUpvotes((prev) => prev - 1);
+        else setLocalDownvotes((prev) => prev - 1);
       } else if (isChangingVote) {
         setUserVote(voteType);
         if (voteType === 'up') {
-          setLocalUpvotes(prev => prev + 1);
-          setLocalDownvotes(prev => prev - 1);
+          setLocalUpvotes((prev) => prev + 1);
+          setLocalDownvotes((prev) => prev - 1);
         } else {
-          setLocalDownvotes(prev => prev + 1);
-          setLocalUpvotes(prev => prev - 1);
+          setLocalDownvotes((prev) => prev + 1);
+          setLocalUpvotes((prev) => prev - 1);
         }
       } else {
         setUserVote(voteType);
-        if (voteType === 'up') setLocalUpvotes(prev => prev + 1);
-        else setLocalDownvotes(prev => prev + 1);
+        if (voteType === 'up') setLocalUpvotes((prev) => prev + 1);
+        else setLocalDownvotes((prev) => prev + 1);
       }
 
       if (isRemovingVote) {
-        // Delete vote
-        const { error } = await supabase
-          .from('votes')
-          .delete()
-          .eq('deal_id', deal.id)
-          .eq('user_id', user.id);
-
+        const { error } = await supabase.from('votes').delete().eq('deal_id', deal.id).eq('user_id', user.id);
         if (error) throw error;
       } else {
-        // Upsert vote
         const { error } = await supabase.from('votes').upsert(
           {
             deal_id: deal.id,
@@ -160,7 +155,6 @@ export function DealDetailModal({ visible, deal, onClose, onDealUpdated }: DealD
       onDealUpdated();
     } catch (error) {
       console.error('Error voting:', error);
-      // Revert optimistic update
       fetchUserVote();
       setLocalUpvotes(deal.upvotes);
       setLocalDownvotes(deal.downvotes);
@@ -205,7 +199,6 @@ export function DealDetailModal({ visible, deal, onClose, onDealUpdated }: DealD
         onPress: async () => {
           try {
             const { error } = await supabase.from('comments').delete().eq('id', commentId);
-
             if (error) throw error;
             await fetchComments();
           } catch (error) {
@@ -227,11 +220,7 @@ export function DealDetailModal({ visible, deal, onClose, onDealUpdated }: DealD
         style: 'destructive',
         onPress: async () => {
           try {
-            const { error } = await supabase
-              .from('deals')
-              .update({ is_active: false })
-              .eq('id', deal.id);
-
+            const { error } = await supabase.from('deals').update({ is_active: false }).eq('id', deal.id);
             if (error) throw error;
 
             Alert.alert('Success', 'Deal deleted successfully');
@@ -249,141 +238,121 @@ export function DealDetailModal({ visible, deal, onClose, onDealUpdated }: DealD
   if (!deal) return null;
 
   const isOwner = user?.id === deal.user_id;
+  const score = localUpvotes - localDownvotes;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
-        <ScrollView style={styles.scrollView}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={onClose} style={styles.iconButton}>
+              <Text style={styles.iconText}>✕</Text>
             </TouchableOpacity>
-            {isOwner && (
-              <TouchableOpacity onPress={handleDeleteDeal} style={styles.deleteButton}>
-                <Text style={styles.deleteButtonText}>🗑️</Text>
+            {isOwner ? (
+              <TouchableOpacity onPress={handleDeleteDeal} style={[styles.iconButton, styles.deleteIconButton]}>
+                <Text style={styles.iconText}>🗑️</Text>
               </TouchableOpacity>
+            ) : (
+              <View style={styles.placeholderIcon} />
             )}
           </View>
 
-          {/* Image */}
-          {deal.image_url && (
+          {deal.image_url ? (
             <Image source={{ uri: deal.image_url }} style={styles.image} resizeMode="cover" />
+          ) : (
+            <View style={styles.imageFallback}>
+              <Text style={styles.imageFallbackText}>Fresh deal</Text>
+            </View>
           )}
 
-          {/* Content */}
-          <View style={styles.content}>
-            {/* Title & Discount */}
+          <SurfaceCard style={styles.heroCard}>
             <View style={styles.titleRow}>
               <Text style={styles.title}>{deal.title}</Text>
-              {deal.discount_percentage && (
+              {deal.discount_percentage ? (
                 <View style={styles.discountBadge}>
                   <Text style={styles.discountText}>-{deal.discount_percentage}%</Text>
                 </View>
-              )}
+              ) : null}
             </View>
 
-            {/* Restaurant */}
             <Text style={styles.restaurant}>{deal.restaurant_name}</Text>
-            {deal.address && <Text style={styles.address}>📍 {deal.address}</Text>}
+            {deal.address ? <Text style={styles.address}>📍 {deal.address}</Text> : null}
 
-            {/* Description */}
-            <Text style={styles.description}>{deal.description}</Text>
-
-            {/* Price */}
             <View style={styles.priceRow}>
-              <Text style={styles.price}>€{deal.deal_price}</Text>
-              {deal.original_price && (
-                <Text style={styles.originalPrice}>€{deal.original_price}</Text>
-              )}
+              <Text style={styles.price}>€{Number(deal.deal_price).toFixed(2)}</Text>
+              {deal.original_price ? (
+                <Text style={styles.originalPrice}>€{Number(deal.original_price).toFixed(2)}</Text>
+              ) : null}
             </View>
 
-            {/* Tags */}
-            <View style={styles.tags}>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>{deal.cuisine_type}</Text>
-              </View>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>{deal.deal_type}</Text>
-              </View>
-            </View>
+            {deal.description ? <Text style={styles.description}>{deal.description}</Text> : null}
 
-            {/* Voting */}
-            <View style={styles.votingSection}>
-              <TouchableOpacity
-                style={[styles.voteButton, userVote === 'up' && styles.voteButtonActive]}
+            <View style={styles.tagRow}>
+              <Pill label={deal.cuisine_type || 'food'} />
+              <Pill label={deal.deal_type || 'deal'} />
+            </View>
+          </SurfaceCard>
+
+          <SurfaceCard style={styles.voteCard}>
+            <View style={styles.voteTopRow}>
+              <Text style={styles.sectionTitle}>Community Pulse</Text>
+              <Text style={styles.scoreText}>Score {score >= 0 ? '+' : ''}{score}</Text>
+            </View>
+            <View style={styles.voteButtonsRow}>
+              <PrimaryButton
+                title={`👍 Upvote ${localUpvotes}`}
                 onPress={() => handleVote('up')}
-              >
-                <Text style={styles.voteButtonText}>👍 {localUpvotes}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.voteButton, userVote === 'down' && styles.voteButtonActive]}
+                secondary={userVote !== 'up'}
+              />
+              <PrimaryButton
+                title={`👎 Downvote ${localDownvotes}`}
                 onPress={() => handleVote('down')}
-              >
-                <Text style={styles.voteButtonText}>👎 {localDownvotes}</Text>
-              </TouchableOpacity>
-              <Text style={styles.voteScore}>Score: {localUpvotes - localDownvotes}</Text>
+                secondary={userVote !== 'down'}
+              />
             </View>
+          </SurfaceCard>
 
-            {/* Comments Section */}
-            <View style={styles.commentsSection}>
-              <Text style={styles.sectionTitle}>Comments ({comments.length})</Text>
+          <SurfaceCard>
+            <Text style={styles.sectionTitle}>Comments ({comments.length})</Text>
+            {user ? (
+              <View style={styles.addCommentWrap}>
+                <TextInput
+                  style={styles.commentInput}
+                  value={newComment}
+                  onChangeText={setNewComment}
+                  placeholder="Share your tip, timing, or update..."
+                  placeholderTextColor={theme.colors.textSoft}
+                  multiline
+                  maxLength={1000}
+                />
+                <PrimaryButton
+                  title={loading ? 'Posting...' : 'Post Comment'}
+                  onPress={handleAddComment}
+                  disabled={loading || !newComment.trim()}
+                  rightMeta={`${newComment.length}/1000`}
+                />
+              </View>
+            ) : (
+              <Text style={styles.loginPrompt}>Log in to join the discussion.</Text>
+            )}
 
-              {/* Add Comment */}
-              {user ? (
-                <View style={styles.addCommentContainer}>
-                  <TextInput
-                    style={styles.commentInput}
-                    value={newComment}
-                    onChangeText={setNewComment}
-                    placeholder="Add a comment..."
-                    placeholderTextColor="#999"
-                    multiline
-                    maxLength={1000}
-                  />
-                  <TouchableOpacity
-                    style={[styles.commentButton, loading && styles.commentButtonDisabled]}
-                    onPress={handleAddComment}
-                    disabled={loading || !newComment.trim()}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={styles.commentButtonText}>Post</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <Text style={styles.loginPrompt}>Log in to comment</Text>
-              )}
-
-              {/* Comments List */}
+            <View style={styles.commentList}>
               {comments.map((comment) => (
-                <View key={comment.id} style={styles.comment}>
+                <View key={comment.id} style={styles.commentCard}>
                   <View style={styles.commentHeader}>
-                    <Text style={styles.commentAuthor}>
-                      {comment.profiles?.username || 'Anonymous'}
-                    </Text>
-                    <Text style={styles.commentDate}>
-                      {new Date(comment.created_at).toLocaleDateString()}
-                    </Text>
+                    <Text style={styles.commentAuthor}>{comment.profiles?.username || 'Anonymous'}</Text>
+                    <Text style={styles.commentDate}>{new Date(comment.created_at).toLocaleDateString()}</Text>
                   </View>
                   <Text style={styles.commentText}>{comment.content}</Text>
-                  {user?.id === comment.user_id && (
-                    <TouchableOpacity
-                      onPress={() => handleDeleteComment(comment.id)}
-                      style={styles.deleteCommentButton}
-                    >
+                  {user?.id === comment.user_id ? (
+                    <TouchableOpacity onPress={() => handleDeleteComment(comment.id)}>
                       <Text style={styles.deleteCommentText}>Delete</Text>
                     </TouchableOpacity>
-                  )}
+                  ) : null}
                 </View>
               ))}
             </View>
-          </View>
+          </SurfaceCard>
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
@@ -393,222 +362,196 @@ export function DealDetailModal({ visible, deal, onClose, onDealUpdated }: DealD
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.bg,
   },
   scrollView: {
     flex: 1,
   },
-  header: {
+  contentContainer: {
+    padding: theme.spacing.md,
+    paddingBottom: 42,
+    gap: theme.spacing.md,
+  },
+  headerRow: {
+    marginTop: Platform.OS === 'ios' ? 34 : 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
     alignItems: 'center',
   },
-  closeButtonText: {
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.pill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+  },
+  deleteIconButton: {
+    backgroundColor: theme.colors.danger,
+  },
+  placeholderIcon: {
+    width: 40,
+  },
+  iconText: {
     color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  deleteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(239,68,68,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteButtonText: {
-    fontSize: 20,
+    fontWeight: '700',
+    fontSize: 18,
   },
   image: {
+    height: 260,
     width: '100%',
-    height: 300,
+    borderRadius: theme.radius.lg,
   },
-  content: {
-    padding: 16,
+  imageFallback: {
+    height: 170,
+    borderRadius: theme.radius.lg,
+    backgroundColor: '#ffedd5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageFallbackText: {
+    color: '#9a3412',
+    fontWeight: '800',
+    fontSize: 20,
+  },
+  heroCard: {
+    gap: 10,
   },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    gap: 12,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
     flex: 1,
-    marginRight: 12,
+    color: theme.colors.text,
+    fontSize: theme.type.h2,
+    lineHeight: 28,
+    fontWeight: '900',
   },
   discountBadge: {
-    backgroundColor: '#ef4444',
+    backgroundColor: theme.colors.danger,
+    borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
   },
   discountText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '800',
+    fontSize: 13,
   },
   restaurant: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 4,
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '700',
   },
   address: {
+    color: theme.colors.textMuted,
     fontSize: 14,
-    color: '#999',
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#444',
-    marginBottom: 16,
   },
   priceRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: 12,
-    marginBottom: 16,
   },
   price: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#10b981',
+    color: theme.colors.success,
+    fontSize: 36,
+    fontWeight: '900',
   },
   originalPrice: {
-    fontSize: 18,
-    color: '#999',
-    textDecorationLine: 'line-through',
-  },
-  tags: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 24,
-  },
-  tag: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  tagText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  votingSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 32,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  voteButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-  },
-  voteButtonActive: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
-  },
-  voteButtonText: {
+    color: theme.colors.textSoft,
     fontSize: 16,
+    textDecorationLine: 'line-through',
     fontWeight: '600',
   },
-  voteScore: {
-    fontSize: 16,
-    color: '#666',
-    marginLeft: 'auto',
+  description: {
+    fontSize: 15,
+    color: '#4b5563',
+    lineHeight: 22,
   },
-  commentsSection: {
-    marginTop: 16,
+  tagRow: {
+    flexDirection: 'row',
+    marginTop: 2,
+  },
+  voteCard: {
+    gap: 12,
+  },
+  voteTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 17,
+    fontWeight: '800',
+    color: theme.colors.text,
   },
-  addCommentContainer: {
-    marginBottom: 20,
+  scoreText: {
+    fontSize: 15,
+    color: '#92400e',
+    fontWeight: '800',
+  },
+  voteButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  addCommentWrap: {
+    marginTop: 12,
+    gap: 10,
   },
   commentInput: {
+    minHeight: 90,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    minHeight: 80,
+    borderColor: theme.colors.border,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     textAlignVertical: 'top',
-    marginBottom: 8,
-  },
-  commentButton: {
-    backgroundColor: '#3b82f6',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  commentButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  commentButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    color: theme.colors.text,
   },
   loginPrompt: {
+    marginTop: 10,
+    color: theme.colors.textMuted,
     fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    padding: 20,
   },
-  comment: {
+  commentList: {
+    marginTop: 12,
+    gap: 10,
+  },
+  commentCard: {
     backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
+    borderWidth: 1,
+    borderRadius: theme.radius.md,
     padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
+    gap: 8,
   },
   commentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
   },
   commentAuthor: {
+    color: '#111827',
     fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: '700',
   },
   commentDate: {
+    color: theme.colors.textSoft,
     fontSize: 12,
-    color: '#9ca3af',
   },
   commentText: {
+    color: '#374151',
     fontSize: 14,
-    color: '#4b5563',
     lineHeight: 20,
   },
-  deleteCommentButton: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-  },
   deleteCommentText: {
+    color: theme.colors.danger,
     fontSize: 12,
-    color: '#ef4444',
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
