@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Image, RefreshControl } from 'react-native';
-import { Text, View } from '@/components/Themed';
-import { useAuth } from '../../contexts/AuthContext';
+import { StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Image, RefreshControl, View, Text } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { DealDetailModal } from '../../components/DealDetailModal';
+import { theme } from '../../constants/theme';
 
 interface Deal {
   id: string;
@@ -25,7 +24,6 @@ interface Deal {
 }
 
 export default function ListScreen() {
-  const { user } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,58 +71,52 @@ export default function ListScreen() {
     fetchDeals();
   };
 
-  const renderDealCard = ({ item }: { item: Deal }) => (
-    <TouchableOpacity style={styles.card} onPress={() => handleDealPress(item)}>
-      {item.image_url && (
-        <Image
-          source={{ uri: item.image_url }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      )}
-      <View style={styles.cardContent}>
-        <View style={styles.header}>
-          <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-          {item.discount_percentage && (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>-{item.discount_percentage}%</Text>
+  const renderDealCard = ({ item }: { item: Deal }) => {
+    const score = (item.upvotes || 0) - (item.downvotes || 0);
+
+    return (
+      <TouchableOpacity style={styles.card} onPress={() => handleDealPress(item)} activeOpacity={0.9}>
+        {item.image_url ? (
+          <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" />
+        ) : (
+          <View style={[styles.image, styles.imageFallback]}>
+            <Text style={styles.imageFallbackText}>FoodDeal</Text>
+          </View>
+        )}
+
+        <View style={styles.cardContent}>
+          <View style={styles.rowTop}>
+            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+            <View style={styles.priceWrap}>
+              <Text style={styles.price}>€{Number(item.deal_price).toFixed(2)}</Text>
+              {!!item.original_price && <Text style={styles.originalPrice}>€{Number(item.original_price).toFixed(2)}</Text>}
             </View>
-          )}
-        </View>
-
-        <Text style={styles.restaurant}>{item.restaurant_name}</Text>
-        <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
-
-        <View style={styles.footer}>
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}>€{item.deal_price}</Text>
-            {item.original_price && (
-              <Text style={styles.originalPrice}>€{item.original_price}</Text>
-            )}
           </View>
 
-          <View style={styles.voteContainer}>
-            <Text style={styles.voteText}>👍 {item.upvotes}</Text>
-            <Text style={styles.voteText}>👎 {item.downvotes}</Text>
-          </View>
-        </View>
+          <Text style={styles.restaurant} numberOfLines={1}>{item.restaurant_name}</Text>
+          <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
 
-        <View style={styles.tags}>
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>{item.cuisine_type}</Text>
-          </View>
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>{item.deal_type}</Text>
+          <View style={styles.rowBottom}>
+            <View style={styles.tagsRow}>
+              <View style={styles.tag}><Text style={styles.tagText}>{item.cuisine_type || 'food'}</Text></View>
+              <View style={styles.tag}><Text style={styles.tagText}>{item.deal_type || 'deal'}</Text></View>
+            </View>
+
+            <View style={styles.votePill}>
+              <Text style={styles.voteText}>▲ {item.upvotes || 0}</Text>
+              <Text style={styles.voteDot}>•</Text>
+              <Text style={styles.voteScore}>{score}</Text>
+            </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" />
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Loading deals...</Text>
       </View>
     );
@@ -132,14 +124,17 @@ export default function ListScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>FoodDeals Berlin</Text>
+        <Text style={styles.headerSub}>Best local offers right now</Text>
+      </View>
+
       <FlatList
         data={deals}
         renderItem={renderDealCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No deals available</Text>
@@ -147,127 +142,50 @@ export default function ListScreen() {
         }
       />
 
-      <DealDetailModal
-        visible={modalVisible}
-        deal={selectedDeal}
-        onClose={handleModalClose}
-        onDealUpdated={handleDealUpdated}
-      />
+      <DealDetailModal visible={modalVisible} deal={selectedDeal} onClose={handleModalClose} onDealUpdated={handleDealUpdated} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  listContent: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: theme.colors.bg },
+  header: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 8 },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: theme.colors.text },
+  headerSub: { fontSize: 13, color: theme.colors.muted, marginTop: 3 },
+  listContent: { paddingHorizontal: 14, paddingBottom: 110, paddingTop: 8 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.bg },
+  loadingText: { marginTop: 10, color: theme.colors.muted },
+
   card: {
-    marginBottom: 16,
-    borderRadius: 12,
+    marginBottom: 14,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadow.card,
   },
-  image: {
-    width: '100%',
-    height: 200,
-  },
-  cardContent: {
-    padding: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    flex: 1,
-    marginRight: 8,
-  },
-  discountBadge: {
-    backgroundColor: '#ef4444',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  discountText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  restaurant: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  description: {
-    fontSize: 14,
-    color: '#444',
-    marginBottom: 12,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  price: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#10b981',
-  },
-  originalPrice: {
-    fontSize: 14,
-    color: '#999',
-    textDecorationLine: 'line-through',
-  },
-  voteContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  voteText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  tags: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  tag: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  loadingText: {
-    marginTop: 10,
-  },
-  emptyContainer: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-  },
+  image: { width: '100%', height: 170 },
+  imageFallback: { backgroundColor: '#fde7d7', justifyContent: 'center', alignItems: 'center' },
+  imageFallbackText: { color: '#9a3412', fontWeight: '700' },
+  cardContent: { padding: 14 },
+  rowTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  title: { flex: 1, fontSize: 18, lineHeight: 22, fontWeight: '800', color: theme.colors.text },
+  priceWrap: { alignItems: 'flex-end' },
+  price: { fontSize: 24, fontWeight: '900', color: theme.colors.success },
+  originalPrice: { fontSize: 12, color: '#9ca3af', textDecorationLine: 'line-through' },
+  restaurant: { marginTop: 6, fontSize: 14, color: '#374151', fontWeight: '600' },
+  description: { marginTop: 6, fontSize: 14, lineHeight: 20, color: '#4b5563' },
+
+  rowBottom: { marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  tagsRow: { flexDirection: 'row', gap: 6, flexShrink: 1 },
+  tag: { backgroundColor: theme.colors.chipBg, borderColor: '#fed7aa', borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  tagText: { color: theme.colors.chipText, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  votePill: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fed7aa' },
+  voteText: { fontSize: 12, fontWeight: '700', color: '#9a3412' },
+  voteDot: { marginHorizontal: 6, color: '#fdba74' },
+  voteScore: { fontSize: 12, fontWeight: '800', color: '#c2410c' },
+
+  emptyContainer: { padding: 40, alignItems: 'center' },
+  emptyText: { color: theme.colors.muted, fontSize: 15 },
 });

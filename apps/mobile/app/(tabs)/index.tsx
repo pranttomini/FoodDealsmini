@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, ActivityIndicator, View as RNView, Alert } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { StyleSheet, ActivityIndicator, View, Alert, Platform, Text } from 'react-native';
 import * as Location from 'expo-location';
-import { Text, View } from '@/components/Themed';
-import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { DealDetailModal } from '../../components/DealDetailModal';
+import { theme } from '../../constants/theme';
 
 const BERLIN_CENTER = {
   latitude: 52.52,
@@ -17,33 +15,20 @@ const BERLIN_CENTER = {
 interface Deal {
   id: string;
   title: string;
-  description: string;
   restaurant_name: string;
-  address: string;
   latitude: number;
   longitude: number;
   deal_price: number;
-  original_price: number;
-  discount_percentage: number;
-  image_url: string | null;
-  cuisine_type: string;
-  deal_type: string;
-  upvotes: number;
-  downvotes: number;
-  vote_score: number;
-  user_id: string;
-  created_at: string;
+  [key: string]: any;
 }
 
 export default function MapScreen() {
-  const { user } = useAuth();
   const [location, setLocation] = useState(BERLIN_CENTER);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Request location permission and get user location
   useEffect(() => {
     (async () => {
       try {
@@ -63,18 +48,13 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // Fetch deals from Supabase
   useEffect(() => {
     fetchDeals();
   }, []);
 
   const fetchDeals = async () => {
     try {
-      const { data, error } = await supabase
-        .from('deals')
-        .select('*')
-        .eq('is_active', true);
-
+      const { data, error } = await supabase.from('deals').select('*').eq('is_active', true);
       if (error) throw error;
       setDeals(data || []);
     } catch (error) {
@@ -85,31 +65,33 @@ export default function MapScreen() {
     }
   };
 
-  const handleMarkerPress = (deal: Deal) => {
-    setSelectedDeal(deal);
-    setModalVisible(true);
-  };
-
-  const handleModalClose = () => {
-    setModalVisible(false);
-    setSelectedDeal(null);
-  };
-
-  const handleDealUpdated = () => {
-    fetchDeals();
-  };
-
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>Loading deals...</Text>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading map...</Text>
       </View>
     );
   }
 
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webPlaceholder}>
+        <Text style={styles.webTitle}>Map View on mobile app</Text>
+        <Text style={styles.webText}>Map rendering is available in native Expo Go builds.</Text>
+        <Text style={styles.webText}>Open List tab for full deal browsing in web preview.</Text>
+      </View>
+    );
+  }
+
+  // keep require for native only to avoid web bundling crash
+  const Maps = require('react-native-maps');
+  const MapView = Maps.default;
+  const Marker = Maps.Marker;
+  const PROVIDER_DEFAULT = Maps.PROVIDER_DEFAULT;
+
   return (
-    <RNView style={styles.container}>
+    <View style={styles.container}>
       <MapView
         provider={PROVIDER_DEFAULT}
         style={styles.map}
@@ -120,13 +102,13 @@ export default function MapScreen() {
         {deals.map((deal) => (
           <Marker
             key={deal.id}
-            coordinate={{
-              latitude: Number(deal.latitude),
-              longitude: Number(deal.longitude),
-            }}
+            coordinate={{ latitude: Number(deal.latitude), longitude: Number(deal.longitude) }}
             title={deal.title}
             description={`${deal.restaurant_name} - €${deal.deal_price}`}
-            onPress={() => handleMarkerPress(deal)}
+            onPress={() => {
+              setSelectedDeal(deal);
+              setModalVisible(true);
+            }}
           />
         ))}
       </MapView>
@@ -134,24 +116,29 @@ export default function MapScreen() {
       <DealDetailModal
         visible={modalVisible}
         deal={selectedDeal}
-        onClose={handleModalClose}
-        onDealUpdated={handleDealUpdated}
+        onClose={() => {
+          setModalVisible(false);
+          setSelectedDeal(null);
+        }}
+        onDealUpdated={fetchDeals}
       />
-    </RNView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1 },
+  map: { width: '100%', height: '100%' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.bg },
+  loadingText: { marginTop: 10, color: theme.colors.muted },
+  webPlaceholder: {
     flex: 1,
+    backgroundColor: theme.colors.bg,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 24,
+    gap: 10,
   },
-  map: {
-    width: '100%',
-    height: '100%',
-  },
-  loadingText: {
-    marginTop: 10,
-  },
+  webTitle: { fontSize: 22, fontWeight: '800', color: theme.colors.text },
+  webText: { fontSize: 14, color: theme.colors.muted, textAlign: 'center' },
 });
