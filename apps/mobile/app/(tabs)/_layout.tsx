@@ -14,24 +14,47 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? 'light'];
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
+        tabBarActiveTintColor: palette.tint,
+        tabBarInactiveTintColor: palette.tabIconDefault,
+        tabBarStyle: {
+          position: 'absolute',
+          left: 14,
+          right: 14,
+          bottom: 18,
+          borderRadius: 20,
+          height: 64,
+          paddingTop: 8,
+          paddingBottom: 8,
+          backgroundColor: colorScheme === 'dark' ? '#111827' : '#ffffff',
+          borderTopWidth: 0,
+          shadowColor: '#000',
+          shadowOpacity: 0.12,
+          shadowOffset: { width: 0, height: 8 },
+          shadowRadius: 20,
+          elevation: 12,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '700',
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Map',
+          title: 'Home',
           tabBarIcon: ({ color }) => <TabBarIcon name="map" color={color} />,
         }}
       />
       <Tabs.Screen
         name="list"
         options={{
-          title: 'List',
+          title: 'Deals',
           tabBarIcon: ({ color }) => <TabBarIcon name="list" color={color} />,
         }}
       />
