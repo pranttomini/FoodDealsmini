@@ -1,0 +1,8 @@
+{
+  "name": "FoodDeals Berlin",
+  "description": "A community-based, open platform for discovering local food deals in Berlin without registration.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
